@@ -858,3 +858,25 @@ task "bwcTestSuite"(type: RestIntegTestTask) {
     dependsOn tasks.named("rollingUpgradeClusterTask")
     dependsOn tasks.named("fullRestartClusterTask")
 }
+
+task integTestRemote(type: RestIntegTestTask) {
+    useCluster testClusters.bwcFollower1
+    doFirst {
+        getClusters().forEach { cluster ->
+            String alltransportSocketURI = cluster.nodes.stream().flatMap { node ->
+                node.getAllTransportPortURI().stream()
+            }.collect(Collectors.joining(","))
+            String allHttpSocketURI = cluster.nodes.stream().flatMap { node ->
+                node.getAllHttpSocketURI().stream()
+            }.collect(Collectors.joining(","))
+
+            systemProperty "tests.cluster.${cluster.name}.http_hosts", "${-> allHttpSocketURI}"
+            systemProperty "tests.cluster.${cluster.name}.transport_hosts", "${-> alltransportSocketURI}"
+            systemProperty "tests.cluster.${cluster.name}.security_enabled", "${-> securityEnabled.toString()}"
+            configureCluster(cluster, securityEnabled)
+        }
+    }
+    filter {
+        setIncludePatterns("org.opensearch.replication.sanity.BasicSanityIT")
+    }
+}
